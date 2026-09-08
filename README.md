@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Attendance Manager
 
-## Getting Started
+A Next.js attendance-management application with PostgreSQL persistence.
 
-First, run the development server:
+## Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Next.js 16 / React 19
+- PostgreSQL
+- `postgres` Node.js client
+- Tailwind CSS
+- Lucide icons
+
+## Database setup
+
+Create a PostgreSQL database named `attendance_manager` (or use an existing database) and set:
+
+```env
+DATABASE_URL=postgresql://username:password@localhost:5432/attendance_manager
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copy `.env.example` to `.env.local` and fill in the connection string.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Apply the schema:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+psql "$DATABASE_URL" -f db/migrations/0001_initial.sql
+```
 
-## Learn More
+Seed the default development class and roster:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+psql "$DATABASE_URL" -f db/seed.sql
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Check connectivity after starting the application:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```text
+GET /api/health/db
+```
 
-## Deploy on Vercel
+A healthy database returns a JSON response with `status: "ok"` and `database: "connected"`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Attendance flow
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The daily dashboard reads the roster and attendance records through server APIs. Attendance writes use PostgreSQL upserts keyed by student and attendance date, so changing a status updates the existing record instead of creating duplicates.
+
+The history page also reads from PostgreSQL and provides student-level attendance summaries and CSV export.
+
+## Development
+
+```bash
+npm install
+npm run dev
+```
+
+Validation scripts currently available:
+
+```bash
+npm run lint
+npm run build
+```
+
+## Database model
+
+```text
+classes
+  └── students
+        └── attendance_records
+```
+
+Attendance records are constrained to `present`, `absent`, or `late`, and each student can have at most one record per date.
