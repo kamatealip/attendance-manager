@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { listAttendanceHistory } from "../../../../../lib/db/attendance";
+import { listAttendanceHistory } from "../../../../lib/db/attendance";
 
 export async function GET() {
   try {
