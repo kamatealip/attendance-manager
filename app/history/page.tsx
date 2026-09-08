@@ -7,50 +7,19 @@ import { Button } from "@/components/ui/button";
 
 type Status = "present" | "absent" | "late";
 type Row = { studentId: number; studentName: string; rollNumber: string; attendanceDate: string; status: Status };
-
 type StudentSummary = { studentId: number; name: string; marked: number; present: number; late: number; absent: number; rate: number };
 
-function formatDate(key: string) {
-  return new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${key}T00:00:00`));
-}
-function shortDate(key: string) {
-  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(`${key}T00:00:00`));
-}
+function formatDate(key: string) { return new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${key}T00:00:00`)); }
+function shortDate(key: string) { return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(`${key}T00:00:00`)); }
 function escapeCsv(value: string) { return `"${value.replaceAll('"', '""')}"`; }
-
-function exportHistory(rows: Row[]) {
-  const csv = "\uFEFF" + [["Date", "Roll", "Student", "Status"], ...rows.map((row) => [row.attendanceDate, row.rollNumber, row.studentName, row.status])].map((row) => row.map(escapeCsv).join(",")).join("\n") + "\n";
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  const anchor = document.createElement("a"); anchor.href = url; anchor.download = `attendance-history-${new Date().toISOString().slice(0, 10)}.csv`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
-}
+function exportHistory(rows: Row[]) { const csv = "\uFEFF" + [["Date", "Roll", "Student", "Status"], ...rows.map((row) => [row.attendanceDate, row.rollNumber, row.studentName, row.status])].map((row) => row.map(escapeCsv).join(",")).join("\n") + "\n"; const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `attendance-history-${new Date().toISOString().slice(0, 10)}.csv`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url); }
 
 export default function HistoryPage() {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [selected, setSelected] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    fetch("/api/attendance/history", { cache: "no-store" })
-      .then(async (response) => { if (!response.ok) throw new Error(); return response.json(); })
-      .then((payload) => { const data = payload.data as Row[]; setRows(data); setSelected(data[0]?.attendanceDate ?? ""); })
-      .catch(() => setError("Could not load attendance history from PostgreSQL."))
-      .finally(() => setLoading(false));
-  }, []);
-
+  const [rows, setRows] = useState<Row[]>([]); const [selected, setSelected] = useState(""); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
+  useEffect(() => { fetch("/api/attendance/history", { cache: "no-store" }).then(async (response) => { if (!response.ok) throw new Error(); return response.json(); }).then((payload) => { const data = payload.data as Row[]; setRows(data); setSelected(data[0]?.attendanceDate ?? ""); }).catch(() => setError("Could not load attendance history from PostgreSQL.")).finally(() => setLoading(false)); }, []);
   const dates = useMemo(() => [...new Set(rows.map((row) => row.attendanceDate))], [rows]);
   const current = rows.filter((row) => row.attendanceDate === selected);
-  const summaries = useMemo<StudentSummary[]>(() => {
-    const map = new Map<number, StudentSummary>();
-    for (const row of rows) {
-      const item = map.get(row.studentId) ?? { studentId: row.studentId, name: row.studentName, marked: 0, present: 0, late: 0, absent: 0, rate: 0 };
-      item.marked++;
-      item[row.status]++;
-      item.rate = Math.round(((item.present + item.late) / item.marked) * 100);
-      map.set(row.studentId, item);
-    }
-    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [rows]);
+  const summaries = useMemo<StudentSummary[]>(() => { const map = new Map<number, StudentSummary>(); for (const row of rows) { const item = map.get(row.studentId) ?? { studentId: row.studentId, name: row.studentName, marked: 0, present: 0, late: 0, absent: 0, rate: 0 }; item.marked++; if (row.status === "present") item.present++; if (row.status === "late") item.late++; if (row.status === "absent") item.absent++; item.rate = Math.round(((item.present + item.late) / item.marked) * 100); map.set(row.studentId, item); } return [...map.values()].sort((a, b) => a.name.localeCompare(b.name)); }, [rows]);
 
   return <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-10"><div className="mx-auto max-w-6xl space-y-6">
     <header className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:flex-row sm:items-end sm:justify-between"><div><Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900"><ArrowLeft className="size-4" /> Daily attendance</Link><p className="mt-5 text-sm font-medium uppercase tracking-[0.2em] text-emerald-600">Attendance Manager</p><h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Attendance history</h1><p className="mt-2 text-sm text-slate-500">Historical records are now read directly from PostgreSQL.</p></div><div className="flex flex-wrap gap-2"><div className="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-600"><CalendarDays className="size-4" /> {dates.length} days</div>{rows.length > 0 && <Button variant="outline" onClick={() => exportHistory(rows)}><Download /> Export CSV</Button>}</div></header>
