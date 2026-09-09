@@ -44,3 +44,26 @@ export async function upsertAttendance(studentId: number, date: string, status: 
 
   return record;
 }
+
+export async function bulkUpsertAttendance(
+  date: string,
+  records: Array<{ studentId: number; status: AttendanceStatus }>,
+) {
+  return sql.begin(async (transaction) => {
+    const saved: AttendanceRecord[] = [];
+
+    for (const record of records) {
+      const [row] = await transaction<AttendanceRecord[]>`
+        INSERT INTO attendance_records (student_id, attendance_date, status)
+        VALUES (${record.studentId}, ${date}::date, ${record.status})
+        ON CONFLICT (student_id, attendance_date)
+        DO UPDATE SET status = EXCLUDED.status, updated_at = NOW()
+        RETURNING id, student_id AS "studentId", attendance_date::text AS "attendanceDate", status
+      `;
+
+      saved.push(row);
+    }
+
+    return saved;
+  });
+}
